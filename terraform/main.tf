@@ -198,37 +198,47 @@ resource "aws_ecs_cluster" "guide_to_compose_ecs" {
 ### Task Defenition ###
 
 resource "aws_ecs_task_definition" "aws_task_defenition" {
-  family                   = var.task_def_family_name
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = 256
-  memory                   = 512
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+    family                   = var.task_def_family_name
+    network_mode             = "awsvpc"
+    requires_compatibilities = ["FARGATE"]
+    cpu                      = 256
+    memory                   = 512
+    execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
 
-  container_definitions = jsonencode([
-    {
-      name  = var.container_name
-      image = var.container_image
-      portMappings = [
+    container_definitions = jsonencode([{
+        name  = var.container_name
+        image = var.container_image
+        essential = true
+        portMappings = [{
+            containerPort = var.container_port
+            protocol      = "tcp"
+        }]
+        environment = [
         {
-          containerPort = var.container_port
-          protocol      = "tcp"
+            name = "PORT",
+            value = "80"
         }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.aws_node_app.name
-          awslogs-region        = var.aws_region
-          awslogs-stream-prefix = "ecs"
-        }
-      }
-    }
-  ])
+        ],
+        logConfiguration = {
+            logDriver = "awslogs"
+            options = {
+                awslogs-group         = aws_cloudwatch_log_group.aws_node_app.name
+                awslogs-region        = var.aws_region
+                awslogs-stream-prefix = "ecs"
 
-  tags = {
-    Name        = "${var.app_name}-task"
-  }
+            }
+        }
+    }])
+
+    runtime_platform {
+        operating_system_family = "LINUX"
+        cpu_architecture        = "X86_64"
+    }
+  
+
+    tags = {
+        Name        = "${var.app_name}-task"
+    }
 }
 
 ### Service ###
@@ -241,7 +251,7 @@ resource "aws_ecs_service" "aws_node_app_service" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = aws_subnet.public_subnet.*.id
+    subnets         = [aws_subnet.public_subnet[0].id, aws_subnet.public_subnet[1].id, aws_subnet.private_subnet[0].id, aws_subnet.private_subnet[1].id]
     security_groups = [aws_security_group.aws_node_app_security_group.id]
   }
 
